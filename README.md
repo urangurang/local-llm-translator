@@ -1,5 +1,7 @@
 # Local LLM Translator for macOS
 
+[한국어](README.ko.md) | English
+
 macOS Automator services for local translation with Ollama.
 
 It includes:
