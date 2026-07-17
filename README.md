@@ -139,9 +139,24 @@ tail -f /tmp/translategemma_ocr.log
 
 ## Uninstall
 
+One-line uninstall:
+
+```zsh
+curl -fsSL https://raw.githubusercontent.com/urangurang/local-llm-translator/main/scripts/uninstall.zsh | zsh
+```
+
+Or from a cloned repo:
+
 ```zsh
 zsh scripts/uninstall.zsh
 ```
+
+The uninstaller removes:
+
+- `~/Library/Services/Translate with translategemma.workflow`
+- `~/Library/Services/Screenshot OCR Translate.workflow`
+- `~/.local/share/local-llm-translator`
+- The two service shortcut entries from `~/Library/Preferences/pbs.plist`
 
 ## Notes
 
