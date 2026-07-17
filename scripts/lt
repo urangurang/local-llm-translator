@@ -1,0 +1,112 @@
+#!/bin/zsh
+set -euo pipefail
+
+export PATH="$PATH:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+SCRIPT_DIR=${0:A:h}
+OLLAMA_MODEL="${OLLAMA_MODEL:-translategemma}"
+OLLAMA_HOST="${OLLAMA_HOST:-http://127.0.0.1:11434}"
+
+usage() {
+  cat <<'EOF'
+lt - Local LLM Translator
+
+Usage:
+  lt text "hello"
+  lt ocr
+  lt server
+  lt doctor
+
+Commands:
+  text [TEXT]   Translate text. Reads stdin if TEXT is omitted.
+  ocr           Select a screen area, run OCR, then translate.
+  server        Open the translator UI with an empty source field.
+  doctor        Check local requirements and Ollama model state.
+  help          Show this help.
+EOF
+}
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+model_exists() {
+  have ollama || return 1
+  ollama list | awk -v model="$OLLAMA_MODEL" '
+    NR > 1 && ($1 == model || $1 == model ":latest") { found = 1 }
+    END { exit !found }
+  '
+}
+
+doctor() {
+  local failed=0
+  echo "Local LLM Translator doctor"
+  echo
+
+  for cmd in python3 curl swift screencapture osascript pbcopy open; do
+    if have "$cmd"; then
+      echo "ok   $cmd"
+    else
+      echo "miss $cmd"
+      failed=1
+    fi
+  done
+
+  if have ollama; then
+    echo "ok   ollama"
+    if curl -fsS "$OLLAMA_HOST/api/tags" >/dev/null 2>&1; then
+      echo "ok   Ollama host: $OLLAMA_HOST"
+    else
+      echo "warn Ollama host not reachable: $OLLAMA_HOST"
+    fi
+    if model_exists; then
+      echo "ok   Ollama model: $OLLAMA_MODEL"
+    else
+      echo "warn Ollama model missing: $OLLAMA_MODEL"
+      echo "     run: ollama pull $OLLAMA_MODEL"
+    fi
+  else
+    echo "miss ollama"
+    failed=1
+  fi
+
+  echo
+  if [ "$failed" -eq 0 ]; then
+    echo "Doctor finished."
+  else
+    echo "Doctor found missing requirements."
+  fi
+  return "$failed"
+}
+
+command_name="${1:-help}"
+if [ "$#" -gt 0 ]; then
+  shift
+fi
+
+case "$command_name" in
+  text)
+    if [ "$#" -gt 0 ]; then
+      "$SCRIPT_DIR/translate_selection.zsh" "$*"
+    else
+      input=$(cat)
+      "$SCRIPT_DIR/translate_selection.zsh" "$input"
+    fi
+    ;;
+  ocr)
+    "$SCRIPT_DIR/screenshot_ocr_translate.zsh"
+    ;;
+  server)
+    "$SCRIPT_DIR/translate_selection.zsh" ""
+    ;;
+  doctor)
+    doctor
+    ;;
+  help|-h|--help)
+    usage
+    ;;
+  *)
+    echo "Unknown command: $command_name" >&2
+    echo >&2
+    usage >&2
+    exit 2
+    ;;
+esac

@@ -7,6 +7,7 @@ RAW_BASE_DEFAULT="https://raw.githubusercontent.com/urangurang/local-llm-transla
 RAW_BASE="${LOCAL_LLM_TRANSLATOR_RAW_BASE:-$RAW_BASE_DEFAULT}"
 REPO_DIR=${0:A:h:h}
 INSTALL_DIR="${LOCAL_LLM_TRANSLATOR_HOME:-$HOME/.local/share/local-llm-translator}"
+BIN_DIR="${LOCAL_LLM_TRANSLATOR_BIN_DIR:-$HOME/.local/bin}"
 SERVICES_DIR="$HOME/Library/Services"
 TEXT_SERVICE_NAME="Translate with translategemma"
 OCR_SERVICE_NAME="Screenshot OCR Translate"
@@ -35,6 +36,7 @@ Options:
   --model NAME           Ollama model name. Default: $OLLAMA_MODEL
   --host URL             Ollama host. Default: $OLLAMA_HOST
   --install-dir PATH     Install scripts here. Default: $INSTALL_DIR
+  --bin-dir PATH         Install the lt command here. Default: $BIN_DIR
   --text-shortcut VALUE  macOS shortcut code. Default: $TEXT_SHORTCUT
   --ocr-shortcut VALUE   macOS shortcut code. Default: $OCR_SHORTCUT
   --no-shortcuts         Install services without writing keyboard shortcuts
@@ -59,6 +61,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --install-dir)
       INSTALL_DIR="${2:?missing value for --install-dir}"
+      shift 2
+      ;;
+    --bin-dir)
+      BIN_DIR="${2:?missing value for --bin-dir}"
       shift 2
       ;;
     --text-shortcut)
@@ -147,7 +153,7 @@ else
 fi
 
 info "Installing scripts to $INSTALL_DIR"
-mkdir -p "$INSTALL_DIR" "$SERVICES_DIR"
+mkdir -p "$INSTALL_DIR" "$BIN_DIR" "$SERVICES_DIR"
 
 install_file() {
   local name="$1"
@@ -166,7 +172,21 @@ install_file() {
 install_file "translate_selection.zsh"
 install_file "screenshot_ocr_translate.zsh"
 install_file "ocr_vision.swift"
-chmod +x "$INSTALL_DIR/translate_selection.zsh" "$INSTALL_DIR/screenshot_ocr_translate.zsh"
+install_file "lt"
+chmod +x "$INSTALL_DIR/translate_selection.zsh" "$INSTALL_DIR/screenshot_ocr_translate.zsh" "$INSTALL_DIR/lt"
+
+if command -v lt >/dev/null 2>&1; then
+  existing_lt=$(command -v lt)
+  if [ "$existing_lt" != "$BIN_DIR/lt" ] && [ "$existing_lt" != "$INSTALL_DIR/lt" ]; then
+    warn "Existing lt command found at $existing_lt. Installing $BIN_DIR/lt may not be first in PATH."
+  fi
+fi
+ln -sf "$INSTALL_DIR/lt" "$BIN_DIR/lt"
+LT_IN_PATH=1
+case ":$PATH:" in
+  *":$BIN_DIR:"*) ;;
+  *) LT_IN_PATH=0 ;;
+esac
 
 info "Creating Automator services"
 python3 - "$INSTALL_DIR" "$SERVICES_DIR" "$TEXT_SERVICE_NAME" "$OCR_SERVICE_NAME" "$TEXT_SHORTCUT" "$OCR_SHORTCUT" "$OLLAMA_MODEL" "$OLLAMA_HOST" "$INSTALL_SHORTCUTS" <<'PY'
@@ -301,10 +321,10 @@ env = f'''export OLLAMA_MODEL={zsh_quote(ollama_model)}
 export OLLAMA_HOST={zsh_quote(ollama_host)}
 '''
 text_command = f'''#!/bin/zsh
-{env}"{install_dir / 'translate_selection.zsh'}" "$@"
+{env}"{install_dir / 'lt'}" text "$@"
 '''
 ocr_command = f'''#!/bin/zsh
-{env}"{install_dir / 'screenshot_ocr_translate.zsh'}"
+{env}"{install_dir / 'lt'}" ocr
 '''
 
 write_workflow(text_service_name, 'text', text_command)
@@ -389,14 +409,19 @@ Services:
 Install dir:
   $INSTALL_DIR
 
+Command:
+  $BIN_DIR/lt
+$(if [ "$LT_IN_PATH" -eq 0 ]; then printf '\nNote:\n  %s is not in PATH yet. Add it to your shell profile to run lt directly.\n' "$BIN_DIR"; fi)
+
 Ollama:
   model: $OLLAMA_MODEL
   host:  $OLLAMA_HOST
 
 Try it:
   1. Start Ollama.
-  2. Select text and run "$TEXT_SERVICE_NAME" from the Services menu.
-  3. Run "$OCR_SERVICE_NAME" for screenshot OCR translation.
+  2. Run: lt doctor
+  3. Run: lt server
+  4. Select text and run "$TEXT_SERVICE_NAME" from the Services menu.
 
 Logs:
   /tmp/translategemma.log

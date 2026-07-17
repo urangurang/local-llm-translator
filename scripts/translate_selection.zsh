@@ -1,5 +1,5 @@
 #!/bin/zsh
-export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+export PATH="$PATH:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 OLLAMA_HOST=${OLLAMA_HOST:-http://127.0.0.1:11434}
 OLLAMA_MODEL=${OLLAMA_MODEL:-translategemma}
 
@@ -77,25 +77,13 @@ printf '%s' "$DIRECTION" > /tmp/direction.txt
 printf '%s' "$SOURCE_LANG" > /tmp/source_lang.txt
 printf '%s' "$TARGET_LANG" > /tmp/target_lang.txt
 
+SKIP_INITIAL_TRANSLATION=0
 if [ ! -s /tmp/original.txt ]; then
+    SKIP_INITIAL_TRANSLATION=1
     printf '%s' '' > /tmp/translated.txt
-    python3 - <<'PYEOF'
-html = """<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>번역 결과</title>
-<style>
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f0f0f5; color: #1a1a2e; min-height: 100vh; display: grid; place-items: center; padding: 24px; }
-.card { width: min(760px, 100%); background: white; border-radius: 16px; padding: 28px; box-shadow: 0 4px 24px rgba(0,0,0,0.1); }
-h1 { margin: 0 0 18px; font-size: 26px; }
-textarea { width: 100%; min-height: 160px; border: 1px solid #d9d9e6; border-radius: 10px; padding: 16px; font: inherit; line-height: 1.7; box-sizing: border-box; }
-.status { margin-top: 14px; color: #d93f3f; font-weight: 700; }
-</style></head>
-<body><div class="card"><h1>번역 결과</h1><textarea placeholder="번역할 원문을 입력하세요." autofocus></textarea><div class="status">원문이 비어 있어 번역하지 않았습니다.</div></div></body></html>"""
-open('/tmp/translation_result.html', 'w', encoding='utf-8').write(html)
-PYEOF
-    open /tmp/translation_result.html
-    exit 0
 fi
 
+if [ "$SKIP_INITIAL_TRANSLATION" -eq 0 ]; then
 printf '%s' "$PROMPT" > /tmp/translategemma_prompt.txt
 
 PAYLOAD=$(python3 - <<'PYEOF'
@@ -200,6 +188,7 @@ import subprocess, unicodedata
 text = unicodedata.normalize('NFC', open('/tmp/translated.txt', encoding='utf-8').read())
 subprocess.run(['pbcopy'], input=text.encode('utf-8'))
 "
+fi
 
 python3 - << 'PYEOF'
 import html as htmllib

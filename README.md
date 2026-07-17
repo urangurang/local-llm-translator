@@ -6,6 +6,7 @@ It includes:
 
 - Selected text translation from English, Korean, or Japanese
 - Screenshot OCR translation using macOS Vision
+- `lt` command line interface
 - Local result pages with source text, translated text, history, and clipboard copy
 - Keyboard shortcuts for both workflows
 
@@ -52,6 +53,7 @@ The installer:
 - Checks macOS requirements
 - Runs `ollama pull translategemma` by default if the model is missing
 - Installs scripts to `~/.local/share/local-llm-translator`
+- Installs the `lt` command to `~/.local/bin/lt`
 - Creates Automator services in `~/Library/Services`
 - Sets default keyboard shortcuts
 - Warns if the requested shortcuts are already used by another macOS Service
@@ -70,6 +72,7 @@ Useful options:
 --model NAME           Ollama model name
 --host URL             Ollama host
 --install-dir PATH     Install scripts somewhere else
+--bin-dir PATH         Install the lt command somewhere else
 --text-shortcut VALUE  macOS shortcut code
 --ocr-shortcut VALUE   macOS shortcut code
 --no-shortcuts         Do not write keyboard shortcuts
@@ -90,6 +93,19 @@ System Settings → Keyboard → Keyboard Shortcuts → Services
 ```
 
 ## Usage
+
+### Command Line
+
+```zsh
+lt doctor
+lt server
+lt text "Hello"
+lt ocr
+```
+
+`lt server` opens the translator UI with an empty source field.
+
+If `lt` is not found after install, add `~/.local/bin` to your shell `PATH`.
 
 ### Selected Text Translation
 
@@ -159,6 +175,7 @@ The uninstaller removes:
 
 - `~/Library/Services/Translate with translategemma.workflow`
 - `~/Library/Services/Screenshot OCR Translate.workflow`
+- `~/.local/bin/lt`
 - `~/.local/share/local-llm-translator`
 - The two service shortcut entries from `~/Library/Preferences/pbs.plist`
 
