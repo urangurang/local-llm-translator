@@ -203,6 +203,8 @@ text_service_name, ocr_service_name = sys.argv[3:5]
 text_shortcut, ocr_shortcut = sys.argv[5:7]
 ollama_model, ollama_host = sys.argv[7:9]
 install_shortcuts = sys.argv[9] == '1'
+backup_dir = install_dir / 'backups'
+backup_dir.mkdir(parents=True, exist_ok=True)
 
 
 def zsh_quote(value):
@@ -291,7 +293,7 @@ def info_plist(name, input_type):
 
 def backup_path(path):
     stamp = datetime.now().strftime('%Y%m%d-%H%M%S')
-    return path.with_name(f'{path.name}.backup-{stamp}')
+    return backup_dir / f'{path.name}.backup-{stamp}'
 
 
 def write_workflow(name, input_type, command):

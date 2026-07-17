@@ -190,6 +190,7 @@ zsh scripts/uninstall.zsh
 - 결과 서버는 기본적으로 고정 포트 `57575`를 사용하고, 새 실행으로 교체되거나 `lt stop`으로 중지할 때까지 살아 있습니다. `LT_RESULT_PORT`로 포트를 바꿀 수 있습니다.
 - 모든 번역 요청은 로컬 Ollama 서버로만 전송됩니다.
 - 인스톨러는 Automator workflow를 `~/Library/Services`에 만들고, 단축키 설정을 `~/Library/Preferences/pbs.plist`에 씁니다.
+- 설치 중 생기는 백업은 `~/.local/share/local-llm-translator/backups`에 저장됩니다. macOS가 백업 workflow를 서비스로 오인하지 않게 하기 위해서입니다.
 - 단축키 충돌 감지는 `pbs.plist`의 다른 macOS Services만 확인합니다. 앱 내부 단축키와는 여전히 충돌할 수 있습니다.
 
 ## 라이선스

@@ -190,6 +190,7 @@ The uninstaller removes:
 - The result server uses fixed port `57575` by default and stays alive until replaced by a new run or stopped with `lt stop`. Override it with `LT_RESULT_PORT`.
 - All translation requests go to your local Ollama server.
 - The installer writes Automator workflows to `~/Library/Services` and shortcut settings to `~/Library/Preferences/pbs.plist`.
+- Installer backups are stored in `~/.local/share/local-llm-translator/backups` so macOS does not scan backup workflows as Services.
 - Shortcut conflict detection currently checks other macOS Services in `pbs.plist`. App-specific shortcuts may still conflict.
 
 ## License
