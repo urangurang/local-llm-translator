@@ -99,11 +99,14 @@ System Settings → Keyboard → Keyboard Shortcuts → Services
 ```zsh
 lt doctor
 lt server
+lt stop
 lt text "Hello"
 lt ocr
 ```
 
 `lt server` opens the translator UI with an empty source field.
+By default, the result UI uses `http://127.0.0.1:57575/translation_result.html`.
+Use `lt stop` to stop the local translator UI server.
 
 If `lt` is not found after install, add `~/.local/bin` to your shell `PATH`.
 
@@ -182,7 +185,7 @@ The uninstaller removes:
 ## Notes
 
 - The result page uses a tiny temporary local Python server so browser retranslation can call Ollama without `file://` CORS issues.
-- The temporary result server shuts down automatically after five minutes.
+- The result server uses fixed port `57575` by default and stays alive until replaced by a new run or stopped with `lt stop`. Override it with `LT_RESULT_PORT`.
 - All translation requests go to your local Ollama server.
 - The installer writes Automator workflows to `~/Library/Services` and shortcut settings to `~/Library/Preferences/pbs.plist`.
 - Shortcut conflict detection currently checks other macOS Services in `pbs.plist`. App-specific shortcuts may still conflict.

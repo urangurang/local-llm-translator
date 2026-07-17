@@ -1027,15 +1027,12 @@ python3 - <<'PYEOF' >/tmp/translategemma_result_server.log 2>&1 &
 import http.server
 import json
 import os
-import socket
 import subprocess
-import threading
-import time
 import urllib.request
-from urllib.parse import urljoin
 from pathlib import Path
 
 HOST = '127.0.0.1'
+RESULT_PORT = int(os.environ.get('LT_RESULT_PORT', '57575'))
 HTML_PATH = Path('/tmp/translation_result.html')
 URL_PATH = Path('/tmp/translategemma_result_url.txt')
 PID_PATH = Path('/tmp/translategemma_result_server.pid')
@@ -1125,20 +1122,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
         else:
             self._send(404, 'Not found')
 
-with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-    s.bind((HOST, 0))
-    port = s.getsockname()[1]
-
-server = http.server.ThreadingHTTPServer((HOST, port), Handler)
-URL_PATH.write_text(f'http://{HOST}:{port}/translation_result.html', encoding='utf-8')
+server = http.server.ThreadingHTTPServer((HOST, RESULT_PORT), Handler)
+URL_PATH.write_text(f'http://{HOST}:{RESULT_PORT}/translation_result.html', encoding='utf-8')
 PID_PATH.write_text(str(os.getpid()), encoding='utf-8')
 
-# Keep the tiny result server around long enough for manual retranslation, then exit.
-def shutdown_later():
-    time.sleep(300)
-    server.shutdown()
-
-threading.Thread(target=shutdown_later, daemon=True).start()
 server.serve_forever()
 PYEOF
 
@@ -1148,6 +1135,12 @@ for i in {1..50}; do
   fi
   sleep 0.1
 done
+
+if [ ! -s /tmp/translategemma_result_url.txt ]; then
+  printf '%s\n' "Failed to start result server. See /tmp/translategemma_result_server.log" >&2
+  tail -n 20 /tmp/translategemma_result_server.log >&2 2>/dev/null || true
+  exit 1
+fi
 
 RESULT_URL=$(cat /tmp/translategemma_result_url.txt)
 printf '%s\n' "Result URL: $RESULT_URL"

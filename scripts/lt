@@ -15,12 +15,14 @@ Usage:
   lt text "hello"
   lt ocr
   lt server
+  lt stop
   lt doctor
 
 Commands:
   text [TEXT]   Translate text. Reads stdin if TEXT is omitted.
   ocr           Select a screen area, run OCR, then translate.
   server        Open the translator UI with an empty source field.
+  stop          Stop the local translator UI server.
   doctor        Check local requirements and Ollama model state.
   help          Show this help.
 EOF
@@ -98,6 +100,21 @@ case "$command_name" in
     "$SCRIPT_DIR/translate_selection.zsh" ""
     if [ -s /tmp/translategemma_result_url.txt ]; then
       printf 'Translator UI: %s\n' "$(cat /tmp/translategemma_result_url.txt)"
+    fi
+    ;;
+  stop)
+    if [ -s /tmp/translategemma_result_server.pid ]; then
+      pid=$(cat /tmp/translategemma_result_server.pid)
+      if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then
+        kill "$pid" 2>/dev/null || true
+        rm -f /tmp/translategemma_result_server.pid /tmp/translategemma_result_url.txt
+        echo "Stopped translator UI server."
+      else
+        rm -f /tmp/translategemma_result_server.pid /tmp/translategemma_result_url.txt
+        echo "Translator UI server was not running."
+      fi
+    else
+      echo "Translator UI server is not running."
     fi
     ;;
   doctor)
