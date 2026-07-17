@@ -96,6 +96,9 @@ case "$command_name" in
     ;;
   server)
     "$SCRIPT_DIR/translate_selection.zsh" ""
+    if [ -s /tmp/translategemma_result_url.txt ]; then
+      printf 'Translator UI: %s\n' "$(cat /tmp/translategemma_result_url.txt)"
+    fi
     ;;
   doctor)
     doctor
