@@ -51,6 +51,7 @@ The installer:
 - Installs scripts to `~/.local/share/local-llm-translator`
 - Creates Automator services in `~/Library/Services`
 - Sets default keyboard shortcuts
+- Warns if the requested shortcuts are already used by another macOS Service
 - Backs up existing workflows before replacing them
 
 ### Install Options
@@ -164,6 +165,7 @@ The uninstaller removes:
 - The temporary result server shuts down automatically after five minutes.
 - All translation requests go to your local Ollama server.
 - The installer writes Automator workflows to `~/Library/Services` and shortcut settings to `~/Library/Preferences/pbs.plist`.
+- Shortcut conflict detection currently checks other macOS Services in `pbs.plist`. App-specific shortcuts may still conflict.
 
 ## License
 

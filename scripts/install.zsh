@@ -308,6 +308,30 @@ if install_shortcuts:
         pbs = {}
 
     status = pbs.setdefault('NSServicesStatus', {})
+    managed_keys = {
+        f'(null) - {text_service_name} - runWorkflowAsService',
+        f'(null) - {ocr_service_name} - runWorkflowAsService',
+    }
+    requested = [
+        (text_service_name, text_shortcut),
+        (ocr_service_name, ocr_shortcut),
+    ]
+
+    if text_shortcut and ocr_shortcut and text_shortcut == ocr_shortcut:
+        print(f'Warning: both Local LLM Translator services are using the same shortcut: {text_shortcut}')
+
+    for service_name, shortcut in requested:
+        if not shortcut:
+            continue
+        conflicts = []
+        for existing_name, existing_item in status.items():
+            if existing_name in managed_keys or not isinstance(existing_item, dict):
+                continue
+            if existing_item.get('key_equivalent') == shortcut:
+                conflicts.append(existing_name)
+        for conflict in conflicts:
+            print(f'Warning: shortcut {shortcut} for "{service_name}" is already used by: {conflict}')
+
     for service_name, shortcut in [(text_service_name, text_shortcut), (ocr_service_name, ocr_shortcut)]:
         status[f'(null) - {service_name} - runWorkflowAsService'] = {
             'key_equivalent': shortcut,
