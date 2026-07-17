@@ -23,7 +23,7 @@ The default model name is:
 translategemma
 ```
 
-Install or create the model before using the services:
+The installer checks for this model and pulls it if it is missing:
 
 ```zsh
 ollama pull translategemma
@@ -48,6 +48,7 @@ zsh scripts/install.zsh
 The installer:
 
 - Checks macOS requirements
+- Runs `ollama pull translategemma` by default if the model is missing
 - Installs scripts to `~/.local/share/local-llm-translator`
 - Creates Automator services in `~/Library/Services`
 - Sets default keyboard shortcuts
@@ -70,7 +71,7 @@ Useful options:
 --text-shortcut VALUE  macOS shortcut code
 --ocr-shortcut VALUE   macOS shortcut code
 --no-shortcuts         Do not write keyboard shortcuts
---pull-model           Run ollama pull during install
+--no-pull-model        Skip ollama pull during install
 ```
 
 ## Shortcuts

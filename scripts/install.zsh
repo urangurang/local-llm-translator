@@ -1,7 +1,7 @@
 #!/bin/zsh
 set -euo pipefail
 
-export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+export PATH="$PATH:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
 RAW_BASE_DEFAULT="https://raw.githubusercontent.com/urangurang/local-llm-translator/main"
 RAW_BASE="${LOCAL_LLM_TRANSLATOR_RAW_BASE:-$RAW_BASE_DEFAULT}"
@@ -13,7 +13,7 @@ OCR_SERVICE_NAME="Screenshot OCR Translate"
 OLLAMA_MODEL="${OLLAMA_MODEL:-translategemma}"
 OLLAMA_HOST="${OLLAMA_HOST:-http://127.0.0.1:11434}"
 INSTALL_SHORTCUTS=1
-PULL_MODEL=0
+PULL_MODEL=1
 RESTART_SERVICES=1
 
 if [ -z "${TEXT_SHORTCUT+x}" ]; then
@@ -38,7 +38,7 @@ Options:
   --text-shortcut VALUE  macOS shortcut code. Default: $TEXT_SHORTCUT
   --ocr-shortcut VALUE   macOS shortcut code. Default: $OCR_SHORTCUT
   --no-shortcuts         Install services without writing keyboard shortcuts
-  --pull-model           Run 'ollama pull MODEL' during install
+  --no-pull-model        Skip 'ollama pull MODEL' during install
   --no-restart-services  Do not restart pbs/cfprefsd after install
   -h, --help             Show this help
 
@@ -77,6 +77,10 @@ while [ "$#" -gt 0 ]; do
       PULL_MODEL=1
       shift
       ;;
+    --no-pull-model)
+      PULL_MODEL=0
+      shift
+      ;;
     --no-restart-services)
       RESTART_SERVICES=0
       shift
@@ -102,6 +106,14 @@ require_command() {
   have "$1" || fail "Missing required command: $1"
 }
 
+ollama_model_exists() {
+  local model="$1"
+  ollama list | awk -v model="$model" '
+    NR > 1 && ($1 == model || $1 == model ":latest") { found = 1 }
+    END { exit !found }
+  '
+}
+
 if [ "$(uname -s)" != "Darwin" ]; then
   fail "This installer is macOS-only."
 fi
@@ -117,10 +129,14 @@ require_command open
 
 if have ollama; then
   if [ "$PULL_MODEL" -eq 1 ]; then
-    info "Pulling Ollama model: $OLLAMA_MODEL"
-    ollama pull "$OLLAMA_MODEL"
+    if ollama_model_exists "$OLLAMA_MODEL"; then
+      info "Ollama model already installed: $OLLAMA_MODEL"
+    else
+      info "Pulling Ollama model: $OLLAMA_MODEL"
+      ollama pull "$OLLAMA_MODEL"
+    fi
   elif curl -fsS "$OLLAMA_HOST/api/tags" >/dev/null 2>&1; then
-    if ! ollama list | awk '{print $1}' | grep -qx "$OLLAMA_MODEL"; then
+    if ! ollama_model_exists "$OLLAMA_MODEL"; then
       warn "Ollama is running, but model '$OLLAMA_MODEL' was not found. Run: ollama pull $OLLAMA_MODEL"
     fi
   else
@@ -379,9 +395,8 @@ Ollama:
 
 Try it:
   1. Start Ollama.
-  2. Make sure the model exists: ollama pull $OLLAMA_MODEL
-  3. Select text and run "$TEXT_SERVICE_NAME" from the Services menu.
-  4. Run "$OCR_SERVICE_NAME" for screenshot OCR translation.
+  2. Select text and run "$TEXT_SERVICE_NAME" from the Services menu.
+  3. Run "$OCR_SERVICE_NAME" for screenshot OCR translation.
 
 Logs:
   /tmp/translategemma.log
