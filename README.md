@@ -23,6 +23,8 @@ The default model name is:
 translategemma
 ```
 
+`translategemma:latest` is about 3.3 GB on disk in Ollama.
+
 The installer checks for this model and pulls it if it is missing:
 
 ```zsh
