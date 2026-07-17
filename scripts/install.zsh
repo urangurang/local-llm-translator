@@ -114,7 +114,7 @@ require_command() {
 
 ollama_model_exists() {
   local model="$1"
-  ollama list | awk -v model="$model" '
+  ollama list 2>/dev/null | awk -v model="$model" '
     NR > 1 && ($1 == model || $1 == model ":latest") { found = 1 }
     END { exit !found }
   '
@@ -134,19 +134,19 @@ require_command pbcopy
 require_command open
 
 if have ollama; then
-  if [ "$PULL_MODEL" -eq 1 ]; then
-    if ollama_model_exists "$OLLAMA_MODEL"; then
-      info "Ollama model already installed: $OLLAMA_MODEL"
-    else
-      info "Pulling Ollama model: $OLLAMA_MODEL"
-      ollama pull "$OLLAMA_MODEL"
-    fi
-  elif curl -fsS "$OLLAMA_HOST/api/tags" >/dev/null 2>&1; then
+  if curl -fsS "$OLLAMA_HOST/api/tags" >/dev/null 2>&1; then
     if ! ollama_model_exists "$OLLAMA_MODEL"; then
-      warn "Ollama is running, but model '$OLLAMA_MODEL' was not found. Run: ollama pull $OLLAMA_MODEL"
+      if [ "$PULL_MODEL" -eq 1 ]; then
+        info "Pulling Ollama model: $OLLAMA_MODEL"
+        ollama pull "$OLLAMA_MODEL"
+      else
+        warn "Ollama is running, but model '$OLLAMA_MODEL' was not found. Run: ollama pull $OLLAMA_MODEL"
+      fi
+    else
+      info "Ollama model already installed: $OLLAMA_MODEL"
     fi
   else
-    warn "Could not reach Ollama at $OLLAMA_HOST. Start Ollama before using the services."
+    warn "Could not reach Ollama at $OLLAMA_HOST. Start Ollama and run 'ollama pull $OLLAMA_MODEL' if the model is missing."
   fi
 else
   warn "Ollama CLI was not found. Install Ollama and pull '$OLLAMA_MODEL' before using the services."

@@ -32,7 +32,7 @@ have() { command -v "$1" >/dev/null 2>&1; }
 
 model_exists() {
   have ollama || return 1
-  ollama list | awk -v model="$OLLAMA_MODEL" '
+  ollama list 2>/dev/null | awk -v model="$OLLAMA_MODEL" '
     NR > 1 && ($1 == model || $1 == model ":latest") { found = 1 }
     END { exit !found }
   '
@@ -56,14 +56,15 @@ doctor() {
     echo "ok   ollama"
     if curl -fsS "$OLLAMA_HOST/api/tags" >/dev/null 2>&1; then
       echo "ok   Ollama host: $OLLAMA_HOST"
+      if model_exists; then
+        echo "ok   Ollama model: $OLLAMA_MODEL"
+      else
+        echo "warn Ollama model missing: $OLLAMA_MODEL"
+        echo "     run: ollama pull $OLLAMA_MODEL"
+      fi
     else
       echo "warn Ollama host not reachable: $OLLAMA_HOST"
-    fi
-    if model_exists; then
-      echo "ok   Ollama model: $OLLAMA_MODEL"
-    else
-      echo "warn Ollama model missing: $OLLAMA_MODEL"
-      echo "     run: ollama pull $OLLAMA_MODEL"
+      echo "     start Ollama before using translation commands"
     fi
   else
     echo "miss ollama"
