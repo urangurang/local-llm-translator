@@ -14,7 +14,7 @@ It includes:
 - macOS
 - Ollama
 - Python 3
-- Swift command line tools, included with Xcode Command Line Tools
+- Swift command line tools, included with Xcode Command Line Tools, for macOS Vision OCR in screenshot translation
 - A local Ollama translation model
 
 The default model name is:
