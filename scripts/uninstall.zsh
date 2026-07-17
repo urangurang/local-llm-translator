@@ -26,6 +26,9 @@ for key in [
 ]:
     status.pop(key, None)
 
+if not status:
+    pbs['ServicesShortcutsPresent'] = False
+
 with pbs_path.open('wb') as f:
     plistlib.dump(pbs, f)
 PY

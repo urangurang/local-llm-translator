@@ -31,20 +31,46 @@ ollama pull translategemma
 
 ## Install
 
-Clone the repo and run:
+One-line install:
 
 ```zsh
+curl -fsSL https://raw.githubusercontent.com/urangurang/local-llm-translator/main/scripts/install.zsh | zsh
+```
+
+Or clone the repo and run:
+
+```zsh
+git clone https://github.com/urangurang/local-llm-translator.git
+cd local-llm-translator
 zsh scripts/install.zsh
 ```
 
-For public GitHub install, the intended one-liner will be:
+The installer:
+
+- Checks macOS requirements
+- Installs scripts to `~/.local/share/local-llm-translator`
+- Creates Automator services in `~/Library/Services`
+- Sets default keyboard shortcuts
+- Backs up existing workflows before replacing them
+
+### Install Options
 
 ```zsh
-LOCAL_LLM_TRANSLATOR_RAW_BASE=https://raw.githubusercontent.com/urangurang/local-llm-translator/main \
-  zsh -c "$(curl -fsSL https://raw.githubusercontent.com/urangurang/local-llm-translator/main/scripts/install.zsh)"
+curl -fsSL https://raw.githubusercontent.com/urangurang/local-llm-translator/main/scripts/install.zsh | \
+  zsh -s -- --model translategemma --host http://127.0.0.1:11434
 ```
 
-If the installer is run from a cloned repo, it uses the local files. If it is run from a one-liner, it downloads the remaining scripts from `LOCAL_LLM_TRANSLATOR_RAW_BASE`.
+Useful options:
+
+```text
+--model NAME           Ollama model name
+--host URL             Ollama host
+--install-dir PATH     Install scripts somewhere else
+--text-shortcut VALUE  macOS shortcut code
+--ocr-shortcut VALUE   macOS shortcut code
+--no-shortcuts         Do not write keyboard shortcuts
+--pull-model           Run ollama pull during install
+```
 
 ## Shortcuts
 
