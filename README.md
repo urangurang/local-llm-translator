@@ -101,6 +101,7 @@ System Settings → Keyboard → Keyboard Shortcuts → Services
 ```zsh
 lt doctor
 lt server
+lt status
 lt stop
 lt text "Hello"
 lt ocr
@@ -108,6 +109,7 @@ lt ocr
 
 `lt server` opens the translator UI with an empty source field.
 By default, the result UI uses `http://127.0.0.1:57575/translation_result.html`.
+Use `lt status` to check whether the UI server and Ollama model are running.
 Use `lt stop` to stop the local translator UI server.
 
 If `lt` is not found after install, add `~/.local/bin` to your shell `PATH`.

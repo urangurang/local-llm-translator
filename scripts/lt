@@ -15,6 +15,7 @@ Usage:
   lt text "hello"
   lt ocr
   lt server
+  lt status
   lt stop
   lt doctor
 
@@ -22,6 +23,7 @@ Commands:
   text [TEXT]   Translate text. Reads stdin if TEXT is omitted.
   ocr           Select a screen area, run OCR, then translate.
   server        Open the translator UI with an empty source field.
+  status        Show translator UI server and Ollama status.
   stop          Stop the local translator UI server.
   doctor        Check local requirements and Ollama model state.
   help          Show this help.
@@ -36,6 +38,64 @@ model_exists() {
     NR > 1 && ($1 == model || $1 == model ":latest") { found = 1 }
     END { exit !found }
   '
+}
+
+model_loaded() {
+  have ollama || return 1
+  ollama ps 2>/dev/null | awk -v model="$OLLAMA_MODEL" '
+    NR > 1 && ($1 == model || $1 == model ":latest") { found = 1 }
+    END { exit !found }
+  '
+}
+
+result_server_pid() {
+  if [ ! -s /tmp/translategemma_result_server.pid ]; then
+    return 1
+  fi
+  local pid
+  pid=$(cat /tmp/translategemma_result_server.pid)
+  if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then
+    printf '%s\n' "$pid"
+    return 0
+  fi
+  return 1
+}
+
+status() {
+  echo "Local LLM Translator status"
+  echo
+
+  local pid
+  if pid=$(result_server_pid); then
+    echo "ok   UI server running: pid $pid"
+    if [ -s /tmp/translategemma_result_url.txt ]; then
+      echo "ok   UI URL: $(cat /tmp/translategemma_result_url.txt)"
+    fi
+  else
+    echo "off  UI server not running"
+    if [ -e /tmp/translategemma_result_server.pid ] || [ -e /tmp/translategemma_result_url.txt ]; then
+      rm -f /tmp/translategemma_result_server.pid /tmp/translategemma_result_url.txt
+      echo "     removed stale UI server files"
+    fi
+  fi
+
+  if curl -fsS "$OLLAMA_HOST/api/tags" >/dev/null 2>&1; then
+    echo "ok   Ollama host: $OLLAMA_HOST"
+  else
+    echo "off  Ollama host not reachable: $OLLAMA_HOST"
+  fi
+
+  if model_exists; then
+    echo "ok   Model installed: $OLLAMA_MODEL"
+  else
+    echo "miss Model installed: $OLLAMA_MODEL"
+  fi
+
+  if model_loaded; then
+    echo "ok   Model loaded: $OLLAMA_MODEL"
+  else
+    echo "off  Model loaded: $OLLAMA_MODEL"
+  fi
 }
 
 doctor() {
@@ -102,6 +162,9 @@ case "$command_name" in
     if [ -s /tmp/translategemma_result_url.txt ]; then
       printf 'Translator UI: %s\n' "$(cat /tmp/translategemma_result_url.txt)"
     fi
+    ;;
+  status)
+    status
     ;;
   stop)
     if [ -s /tmp/translategemma_result_server.pid ]; then

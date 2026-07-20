@@ -101,6 +101,7 @@ System Settings → Keyboard → Keyboard Shortcuts → Services
 ```zsh
 lt doctor
 lt server
+lt status
 lt stop
 lt text "Hello"
 lt ocr
@@ -108,6 +109,7 @@ lt ocr
 
 `lt server`는 원문 입력칸이 비어 있는 번역 UI를 엽니다.
 기본 결과 페이지 주소는 `http://127.0.0.1:57575/translation_result.html`입니다.
+UI 서버와 Ollama 모델 상태를 확인하려면 `lt status`를 사용하세요.
 로컬 번역 UI 서버를 끄려면 `lt stop`을 사용하세요.
 
 설치 후 `lt`를 찾을 수 없다면 shell `PATH`에 `~/.local/bin`을 추가하세요.
