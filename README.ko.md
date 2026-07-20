@@ -157,6 +157,13 @@ macOS 단축키 기호:
 - `~` = Option
 - `^` = Control
 
+## 문제 해결
+
+- Ollama가 꺼져 있음: Ollama 앱을 실행하거나 `ollama serve`를 실행한 뒤 `lt status`를 확인하세요.
+- 모델 없음: `ollama pull translategemma`를 실행한 뒤 `lt status`를 확인하세요.
+- OCR 권한 문제: System Settings → Privacy & Security → Screen & System Audio Recording에서 Terminal, Automator, 또는 서비스를 실행하는 앱을 허용하세요.
+- 서비스 단축키가 동작하지 않음: System Settings → Keyboard → Keyboard Shortcuts → Services에서 충돌 여부를 확인하거나 다른 단축키로 재설치하세요.
+
 ## 로그
 
 ```zsh

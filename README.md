@@ -157,6 +157,13 @@ macOS shortcut symbols:
 - `~` = Option
 - `^` = Control
 
+## Troubleshooting
+
+- Ollama is off: start the Ollama app or run `ollama serve`, then check `lt status`.
+- Model is missing: run `ollama pull translategemma`, then check `lt status`.
+- OCR permission fails: System Settings → Privacy & Security → Screen & System Audio Recording, then allow Terminal, Automator, or the app that runs the service.
+- Service shortcut does not run: System Settings → Keyboard → Keyboard Shortcuts → Services, then check for conflicts or reinstall with custom shortcuts.
+
 ## Logs
 
 ```zsh

@@ -123,19 +123,52 @@ PYEOF
 printf '%s
 ' "Payload bytes: ${#PAYLOAD}"
 
-RESPONSE=$(printf '%s' "$PAYLOAD" | curl -sS "$OLLAMA_HOST/api/chat" \
+if ! RESPONSE=$(printf '%s' "$PAYLOAD" | curl -sS --connect-timeout 3 --max-time 120 "$OLLAMA_HOST/api/chat" \
   -H "Content-Type: application/json" \
-  --data-binary @-)
+  --data-binary @-); then
+  RESPONSE=$(python3 - "$OLLAMA_HOST" <<'PYEOF'
+import json
+import sys
+host = sys.argv[1]
+print(json.dumps({
+    'kind': 'ollama_unreachable',
+    'error': f'Could not reach Ollama at {host}',
+}, ensure_ascii=False))
+PYEOF
+)
+fi
 
 printf '%s' "$RESPONSE" > /tmp/translategemma_response.json
 
-TRANSLATED=$(python3 - <<'PYEOF'
+TRANSLATED=$(python3 - "$OLLAMA_MODEL" <<'PYEOF'
 import json
 import sys
 from pathlib import Path
+model = sys.argv[1]
 raw = Path('/tmp/translategemma_response.json').read_text(encoding='utf-8', errors='replace')
 try:
     data = json.loads(raw)
+    if data.get('error'):
+        message = str(data.get('error'))
+        lower = message.lower()
+        if data.get('kind') == 'ollama_unreachable' or 'connection refused' in lower or 'could not reach' in lower:
+            print('번역 오류: Ollama가 꺼져 있거나 연결되지 않았습니다.')
+            print()
+            print('1. Ollama 앱을 실행하거나 터미널에서 `ollama serve`를 실행하세요.')
+            print('2. `lt status`로 Ollama host가 ok인지 확인하세요.')
+            print('3. 다시 번역을 실행하세요.')
+            sys.exit(0)
+        if 'model' in lower and ('not found' in lower or 'pull' in lower):
+            print('번역 오류: Ollama 모델이 없습니다.')
+            print()
+            print(f'1. 터미널에서 `ollama pull {model}`을 실행하세요.')
+            print('2. `lt status`로 Model installed가 ok인지 확인하세요.')
+            print('3. 다시 번역을 실행하세요.')
+            sys.exit(0)
+        print('번역 오류: Ollama 응답 오류')
+        print()
+        print(message)
+        sys.exit(0)
     target = Path('/tmp/target_lang.txt').read_text(encoding='utf-8').strip()
     text = data['message']['content']
     labels = {
@@ -449,6 +482,26 @@ html = '''<!DOCTYPE html>
     color: #6b6f80;
     font-weight: 700;
   }
+  .advice-panel {
+    display: none;
+    border: 1px solid #ffd5d5;
+    background: #fff7f7;
+    color: #5a1d1d;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  .advice-panel.visible { display: grid; gap: 8px; }
+  .advice-title { font-weight: 800; color: #b42318; }
+  .advice-panel ol { margin: 0; padding-left: 18px; }
+  .advice-panel code {
+    background: #fff;
+    border: 1px solid #f0cdcd;
+    border-radius: 5px;
+    padding: 1px 5px;
+    color: #3b1a1a;
+  }
   .section { margin-bottom: 16px; }
   .text-box, .source-input {
     background: #f8f8fc;
@@ -536,6 +589,7 @@ html = '''<!DOCTYPE html>
     </div>
     <div class="status-line" id="requestHint">언어를 선택하면 바로 다시 번역됩니다.</div>
   </div>
+  <div class="advice-panel" id="errorAdvice" aria-live="polite"></div>
 
   <div class="section">
     <div class="source-header">
@@ -588,6 +642,7 @@ const historyListEl = document.getElementById('historyList');
 const historySearchEl = document.getElementById('historySearch');
 const historyFiltersEl = document.getElementById('historyFilters');
 const historyCountEl = document.getElementById('historyCount');
+const errorAdviceEl = document.getElementById('errorAdvice');
 
 originalEl.value = originalText;
 translatedEl.textContent = translatedText;
@@ -638,6 +693,83 @@ function setStatus(text, isError = false) {
 function setRequestHint(text, isError = false) {
   requestHintEl.textContent = text.normalize('NFC');
   requestHintEl.style.color = isError ? '#d93f3f' : '#6b6f80';
+}
+
+function hideAdvice() {
+  errorAdviceEl.classList.remove('visible');
+  errorAdviceEl.replaceChildren();
+}
+
+function showAdvice(title, steps) {
+  errorAdviceEl.replaceChildren();
+  const titleEl = document.createElement('div');
+  titleEl.className = 'advice-title';
+  titleEl.textContent = title;
+  const list = document.createElement('ol');
+  for (const step of steps) {
+    const item = document.createElement('li');
+    const parts = String(step).split(/(`[^`]+`)/g);
+    for (const part of parts) {
+      if (part.startsWith('`') && part.endsWith('`')) {
+        const code = document.createElement('code');
+        code.textContent = part.slice(1, -1);
+        item.appendChild(code);
+      } else {
+        item.appendChild(document.createTextNode(part));
+      }
+    }
+    list.appendChild(item);
+  }
+  errorAdviceEl.append(titleEl, list);
+  errorAdviceEl.classList.add('visible');
+}
+
+function friendlyError(error) {
+  const message = String(error?.message || '');
+  const lower = message.toLowerCase();
+  const kind = error?.kind || '';
+  if (kind === 'model_missing' || (lower.includes('model') && lower.includes('not found'))) {
+    return {
+      title: 'Ollama 모델이 설치되어 있지 않습니다.',
+      hint: `터미널에서 ollama pull ${ollamaModel} 실행`,
+      steps: [
+        `터미널에서 \`ollama pull ${ollamaModel}\` 실행`,
+        '`lt status`로 Model installed가 ok인지 확인',
+        '다시 번역 실행'
+      ]
+    };
+  }
+  if (kind === 'ollama_unreachable' || lower.includes('connection refused') || lower.includes('failed to fetch') || lower.includes('couldn')) {
+    return {
+      title: 'Ollama가 꺼져 있거나 연결되지 않았습니다.',
+      hint: 'Ollama 앱을 실행한 뒤 다시 시도',
+      steps: [
+        'Ollama 앱 실행 또는 터미널에서 `ollama serve` 실행',
+        '`lt status`로 Ollama host가 ok인지 확인',
+        '다시 번역 실행'
+      ]
+    };
+  }
+  if (kind === 'ollama_timeout' || lower.includes('timed out') || lower.includes('timeout')) {
+    return {
+      title: 'Ollama 응답 시간이 너무 오래 걸렸습니다.',
+      hint: '모델 로딩 후 다시 시도하거나 입력을 줄여보세요.',
+      steps: [
+        '`ollama ps`로 모델이 로딩 중인지 확인',
+        '처음 실행 직후라면 잠시 기다렸다가 다시 번역 실행',
+        '긴 원문이면 일부만 나눠서 번역'
+      ]
+    };
+  }
+  return {
+    title: '번역 요청에 실패했습니다.',
+    hint: 'lt status와 로그를 확인하세요.',
+    steps: [
+      '`lt status` 실행',
+      '`tail -n 80 /tmp/translategemma_result_server.log` 확인',
+      '문제가 계속되면 `lt stop` 후 `lt server` 재실행'
+    ]
+  };
 }
 
 function setBusy(isBusy) {
@@ -910,6 +1042,7 @@ async function translateCurrentSelection() {
   setBusy(true);
   setStatus('번역 중...');
   setRequestHint(`${langs[source].name} → ${langs[target].name}`);
+  hideAdvice();
 
   const payload = {
     model: ollamaModel,
@@ -940,10 +1073,12 @@ async function translateCurrentSelection() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    const data = await response.json();
+    const data = await response.json().catch(() => ({ error: 'Invalid translator server response', kind: 'server_response' }));
     if (currentRequest !== requestId) return;
     if (!response.ok || data.error || !data.message || !data.message.content) {
-      throw new Error(data.error || 'Unexpected Ollama response');
+      const requestError = new Error(data.error || 'Unexpected Ollama response');
+      requestError.kind = data.kind || '';
+      throw requestError;
     }
     translatedText = cleanTranslationOutput(data.message.content, target) || data.message.content.trim().normalize('NFC');
     translatedEl.textContent = translatedText;
@@ -959,11 +1094,14 @@ async function translateCurrentSelection() {
     };
     await saveHistoryItem(historyItem);
     setRequestHint('완료');
+    hideAdvice();
     await copyText(translatedText);
   } catch (error) {
     if (currentRequest === requestId) {
-      setStatus(`재번역 실패: ${error.message}`, true);
-      setRequestHint('요청 실패', true);
+      const friendly = friendlyError(error);
+      setStatus(friendly.title, true);
+      setRequestHint(friendly.hint, true);
+      showAdvice(friendly.title, friendly.steps);
     }
   } finally {
     if (currentRequest === requestId) setBusy(false);
@@ -990,6 +1128,7 @@ originalEl.addEventListener('input', () => {
   updateDirection();
   setStatus('원문이 수정되었습니다.');
   setRequestHint('Command + Enter 또는 번역 실행으로 번역합니다.');
+  hideAdvice();
 });
 
 originalEl.addEventListener('keydown', (event) => {
@@ -1042,6 +1181,8 @@ import http.server
 import json
 import os
 import subprocess
+import socket
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -1064,6 +1205,26 @@ def load_history():
 
 def save_history(history):
     HISTORY_PATH.write_text(json.dumps(history[:50], ensure_ascii=False), encoding='utf-8')
+
+def error_payload(kind, message, detail=''):
+    payload = {'kind': kind, 'error': message}
+    if detail:
+        payload['detail'] = detail
+    return json.dumps(payload, ensure_ascii=False)
+
+def classify_ollama_http_error(exc):
+    raw = exc.read().decode('utf-8', errors='replace')
+    message = raw.strip() or str(exc)
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, dict) and parsed.get('error'):
+            message = str(parsed['error'])
+    except Exception:
+        pass
+    lower = message.lower()
+    if exc.code == 404 and 'model' in lower and ('not found' in lower or 'try pulling' in lower or 'pull' in lower):
+        return 'model_missing', message
+    return 'ollama_http_error', message
 
 class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
@@ -1102,9 +1263,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
             try:
                 with urllib.request.urlopen(req, timeout=120) as resp:
                     self._send(resp.status, resp.read(), resp.headers.get('Content-Type', 'application/json'))
+            except urllib.error.HTTPError as exc:
+                kind, message = classify_ollama_http_error(exc)
+                status = 404 if kind == 'model_missing' else 502
+                self._send(status, error_payload(kind, message), 'application/json; charset=utf-8')
+            except (urllib.error.URLError, ConnectionRefusedError) as exc:
+                detail = str(getattr(exc, 'reason', exc))
+                kind = 'ollama_timeout' if 'timed out' in detail.lower() else 'ollama_unreachable'
+                message = f'Could not reach Ollama at {OLLAMA_HOST}'
+                self._send(502, error_payload(kind, message, detail), 'application/json; charset=utf-8')
+            except (TimeoutError, socket.timeout) as exc:
+                self._send(504, error_payload('ollama_timeout', 'Ollama request timed out', str(exc)), 'application/json; charset=utf-8')
             except Exception as exc:
-                payload = json.dumps({'error': str(exc)}, ensure_ascii=False)
-                self._send(502, payload, 'application/json; charset=utf-8')
+                self._send(502, error_payload('translator_server_error', str(exc)), 'application/json; charset=utf-8')
         elif self.path == '/copy':
             try:
                 subprocess.run(['pbcopy'], input=body, check=True)

@@ -3,6 +3,8 @@ set -u
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
 SCRIPT_DIR=${0:A:h}
+OLLAMA_MODEL="${OLLAMA_MODEL:-translategemma}"
+OLLAMA_HOST="${OLLAMA_HOST:-http://127.0.0.1:11434}"
 LOG="/tmp/translategemma_ocr.log"
 CAPTURE_PATH="/tmp/translategemma_ocr_capture.png"
 ORIGINAL_PATH="/tmp/translategemma_ocr_original.txt"
@@ -89,6 +91,7 @@ esac
 
 python3 - "$ORIGINAL_PATH" "$LANG_CHECK" "$TARGET_LANG" > /tmp/translategemma_ocr_payload.json <<'PY'
 import json
+import os
 import sys
 
 source_path, source_lang, target_lang = sys.argv[1:4]
@@ -98,7 +101,7 @@ source_name = names.get(source_lang, 'the source language')
 target_name = names.get(target_lang, 'Korean')
 
 payload = {
-    'model': 'translategemma',
+    'model': os.environ.get('OLLAMA_MODEL', 'translategemma'),
     'stream': False,
     'options': {
         'temperature': 0.2,
@@ -127,23 +130,59 @@ payload = {
 print(json.dumps(payload, ensure_ascii=False))
 PY
 
-curl -s http://127.0.0.1:11434/api/chat \
+if ! curl -sS --connect-timeout 3 --max-time 120 "$OLLAMA_HOST/api/chat" \
   -H "Content-Type: application/json" \
   --data-binary @/tmp/translategemma_ocr_payload.json \
-  > "$RESPONSE_PATH"
+  > "$RESPONSE_PATH"; then
+  python3 - "$RESPONSE_PATH" "$OLLAMA_HOST" <<'PY'
+import json
+import sys
+path, host = sys.argv[1:3]
+payload = {
+    'error': f'Could not reach Ollama at {host}',
+    'kind': 'ollama_unreachable',
+}
+open(path, 'w', encoding='utf-8').write(json.dumps(payload, ensure_ascii=False))
+PY
+fi
 
-python3 - "$RESPONSE_PATH" "$TRANSLATED_PATH" <<'PY'
+python3 - "$RESPONSE_PATH" "$TRANSLATED_PATH" "$OLLAMA_MODEL" <<'PY'
 import json
 import sys
 import unicodedata
 
-response_path, translated_path = sys.argv[1:3]
+response_path, translated_path, model = sys.argv[1:4]
 try:
     data = json.load(open(response_path, encoding='utf-8'))
-    text = data['message']['content'].strip()
+    if data.get('error'):
+        message = str(data.get('error'))
+        lower = message.lower()
+        if data.get('kind') == 'ollama_unreachable' or 'connection refused' in lower or 'could not reach' in lower:
+            text = (
+                '번역 오류: Ollama가 꺼져 있거나 연결되지 않았습니다.\n\n'
+                '1. Ollama 앱을 실행하거나 터미널에서 `ollama serve`를 실행하세요.\n'
+                '2. `lt status`로 Ollama host가 ok인지 확인하세요.\n'
+                '3. 다시 OCR 번역을 실행하세요.'
+            )
+        elif 'model' in lower and ('not found' in lower or 'pull' in lower):
+            text = (
+                f'번역 오류: Ollama 모델이 없습니다.\n\n'
+                f'1. 터미널에서 `ollama pull {model}`을 실행하세요.\n'
+                '2. `lt status`로 Model installed가 ok인지 확인하세요.\n'
+                '3. 다시 OCR 번역을 실행하세요.'
+            )
+        else:
+            text = f'번역 오류: Ollama 응답 오류\n\n{message}'
+    else:
+        text = data['message']['content'].strip()
 except Exception as exc:
     raw = open(response_path, encoding='utf-8', errors='replace').read()[:1000]
-    text = f'번역 오류: Ollama 응답을 읽지 못했습니다.\n오류: {exc}\n\n응답 앞부분:\n{raw}'
+    text = (
+        '번역 오류: Ollama 응답을 읽지 못했습니다.\n\n'
+        '1. `lt status`로 Ollama와 모델 상태를 확인하세요.\n'
+        '2. `/tmp/translategemma_ocr_response.json`와 `/tmp/translategemma_ocr.log`를 확인하세요.\n\n'
+        f'오류: {exc}\n\n응답 앞부분:\n{raw}'
+    )
 
 text = unicodedata.normalize('NFC', text)
 with open(translated_path, 'w', encoding='utf-8') as f:
