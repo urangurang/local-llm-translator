@@ -836,6 +836,18 @@ async function saveHistoryItem(item) {
   } catch {}
 }
 
+async function syncHistoryFromServer(activeId = null) {
+  try {
+    const response = await fetch('/history');
+    if (!response.ok) return;
+    const data = await response.json();
+    if (Array.isArray(data.history)) {
+      historyItems = data.history;
+      renderHistory(activeId);
+    }
+  } catch {}
+}
+
 async function deleteHistoryItem(id) {
   historyItems = historyItems.filter((entry) => entry.id !== id);
   renderHistory(null);
@@ -852,6 +864,7 @@ async function deleteHistoryItem(id) {
         renderHistory(null);
       }
     }
+    setStatus('히스토리에서 삭제했습니다.');
   } catch {}
 }
 
@@ -994,6 +1007,7 @@ historySearchEl.addEventListener('input', () => {
 runTranslateButton.addEventListener('click', translateCurrentSelection);
 
 renderHistory(historyItems[0]?.id || null);
+syncHistoryFromServer(historyItems[0]?.id || null);
 updateControls();
 </script>
 </body>
